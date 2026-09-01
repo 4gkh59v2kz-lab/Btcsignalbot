@@ -165,11 +165,46 @@ function fmtPrice(p) {
 }
 
 async function fetchCandles() {
-  const sources = [
+  // Primary: CryptoCompare - a data aggregator, not an exchange, less likely to be
+  // caught by exchange-specific network/firewall filtering.
+  try {
+    const url = 'https://min-api.cryptocompare.com/data/v2/histominute?fsym=BTC&tsym=USDT&limit=200&aggregate=15';
+    const res = await fetch(url);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.Response === 'Success' && json.Data && Array.isArray(json.Data.Data) && json.Data.Data.length > 30) {
+        const arr = json.Data.Data;
+        return {
+          times: arr.map(c => c.time * 1000),
+          closes: arr.map(c => c.close),
+          source: 'CryptoCompare'
+        };
+      }
+    }
+  } catch (e) { window.lastFetchError = 'CryptoCompare: ' + e.message; }
+
+  // Fallback: CoinGecko (30-minute candles, less precise but works almost everywhere)
+  try {
+    const url = 'https://api.coingecko.com/api/v3/coins/bitcoin/ohlc?vs_currency=usd&days=1';
+    const res = await fetch(url);
+    if (res.ok) {
+      const arr = await res.json();
+      if (Array.isArray(arr) && arr.length > 20) {
+        return {
+          times: arr.map(c => c[0]),
+          closes: arr.map(c => c[4]),
+          source: 'CoinGecko (30m candles)'
+        };
+      }
+    }
+  } catch (e) { window.lastFetchError = (window.lastFetchError || '') + ' | CoinGecko: ' + e.message; }
+
+  // Last resort: Binance (may be blocked on some networks)
+  const binanceSources = [
     'https://api.binance.us/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=200',
     'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=200'
   ];
-  for (const url of sources) {
+  for (const url of binanceSources) {
     try {
       const res = await fetch(url);
       if (!res.ok) continue;
@@ -177,10 +212,11 @@ async function fetchCandles() {
       if (Array.isArray(raw) && raw.length > 30) {
         return {
           times: raw.map(c => c[0]),
-          closes: raw.map(c => parseFloat(c[4]))
+          closes: raw.map(c => parseFloat(c[4])),
+          source: 'Binance'
         };
       }
-    } catch (e) { window.lastFetchError = e.message; continue; }
+    } catch (e) { window.lastFetchError = (window.lastFetchError || '') + ' | Binance: ' + e.message; continue; }
   }
   return null;
 }
@@ -248,7 +284,7 @@ async function loadData() {
     whyEl.textContent = 'No fresh trend change in the last hour';
   }
 
-  document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString() + (data.source ? ' via ' + data.source : '');
 
   const labels = times.map(fmtTime);
   const bullPoints = closes.map((c, idx) => signals.find(s => s.i === idx && s.type === 'bull') ? c : null);
