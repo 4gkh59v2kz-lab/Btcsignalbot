@@ -150,6 +150,13 @@
   </div>
 
   <div class="card">
+    <div class="card-title">Paper trading (simulated, no real money)</div>
+    <div id="paperTradingBody">
+      <div class="empty">Collecting data…</div>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="card-title">Pattern log (builds over time)</div>
     <div id="statsBody">
       <div class="empty">Collecting data…</div>
@@ -191,7 +198,7 @@ function pruneLog(log) {
   return log;
 }
 
-function recordObservation(market, btcPrice, divergenceFired, divergenceDirection, trendState, mom1m, mom5m, resolvedYesBid) {
+function recordObservation(market, btcPrice, divergenceFired, divergenceDirection, trendState, mom1m, mom5m, resolvedYesBid, resolvedYesAsk, resolvedNoAsk) {
   const log = loadLog();
   const ticker = market.ticker;
   if (!ticker) return;
@@ -202,6 +209,8 @@ function recordObservation(market, btcPrice, divergenceFired, divergenceDirectio
       closeTime: market.close_time,
       strike: market.floor_strike ?? null,
       firstYesBid: resolvedYesBid ?? null,
+      firstYesAsk: resolvedYesAsk ?? null,
+      firstNoAsk: resolvedNoAsk ?? null,
       firstBtcPrice: btcPrice,
       firstTrendState: trendState ?? null,
       firstMom1m: mom1m ?? null,
@@ -315,6 +324,52 @@ function computeStats() {
     trendTotal: trendRecords.length, trendCorrect,
     momTotal: momRecords.length, momCorrect
   };
+}
+
+function computePaperTrades() {
+  const log = loadLog();
+  const records = Object.values(log).filter(r => r.result === 'yes' || r.result === 'no');
+
+  // Strategy: buy Up when 1-min momentum is positive, buy Down when negative, skip when flat/missing.
+  // Cost = the ask price you'd actually pay per contract. Payout = $1 if correct, $0 if wrong.
+  const trades = [];
+  for (const r of records) {
+    if (typeof r.firstMom1m !== 'number' || r.firstMom1m === 0) continue;
+    const side = r.firstMom1m > 0 ? 'yes' : 'no';
+    const entryPriceCents = side === 'yes' ? r.firstYesAsk : r.firstNoAsk;
+    if (entryPriceCents == null) continue; // can't simulate without a real entry price
+    const won = (side === 'yes' && r.result === 'yes') || (side === 'no' && r.result === 'no');
+    const costPerContract = entryPriceCents / 100;
+    const pnlPerContract = won ? (1 - costPerContract) : -costPerContract;
+    trades.push({ side, won, costPerContract, pnlPerContract });
+  }
+
+  const n = trades.length;
+  const wins = trades.filter(t => t.won).length;
+  const totalPnl = trades.reduce((sum, t) => sum + t.pnlPerContract, 0);
+  const avgPnl = n > 0 ? totalPnl / n : 0;
+
+  return { n, wins, totalPnl, avgPnl };
+}
+
+function renderPaperTrading() {
+  const p = computePaperTrades();
+  const el = document.getElementById('paperTradingBody');
+  if (p.n < 5) {
+    el.innerHTML = '<div class="empty">Collecting data (' + p.n + '/5 needed) — simulated trades only count windows where momentum gave a clear signal and a real entry price was captured.</div>';
+    return;
+  }
+  const winPct = ((p.wins / p.n) * 100).toFixed(1);
+  const [lo, hi] = wilsonInterval(p.wins, p.n);
+  const pnlColor = p.totalPnl >= 0 ? '#2FBF71' : '#F2545B';
+  let html = '<div class="note" style="margin-top:0">';
+  html += 'Strategy: buy Up when 1-min momentum is positive, buy Down when negative. 1 contract per trade, real entry prices.<br><br>';
+  html += '<b style="color:#E6E6E1">' + p.n + '</b> simulated trades &middot; Won <b style="color:#E6E6E1">' + winPct + '%</b> <span style="color:#8B8F98">(95% range: ' + lo.toFixed(0) + '–' + hi.toFixed(0) + '%)</span><br>';
+  html += 'Simulated P&L: <b style="color:' + pnlColor + '">' + (p.totalPnl >= 0 ? '+$' : '-$') + Math.abs(p.totalPnl).toFixed(2) + '</b> total, ' +
+    (p.avgPnl >= 0 ? '+' : '') + (p.avgPnl * 100).toFixed(1) + '¢ average per contract<br>';
+  html += '<br><span style="color:#8B8F98">This is hypothetical only — no real money moved. Win rate above 50% does not guarantee profit if the entry prices were expensive; P&L is the number that actually matters.</span>';
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function wilsonInterval(successes, n) {
@@ -634,6 +689,8 @@ async function loadAll() {
 
     const yesBid = market.yes_bid ?? (market.yes_bid_dollars ? market.yes_bid_dollars * 100 : null);
     const noBid = market.no_bid ?? (market.no_bid_dollars ? market.no_bid_dollars * 100 : null);
+    const yesAsk = market.yes_ask ?? (market.yes_ask_dollars ? market.yes_ask_dollars * 100 : null);
+    const noAsk = market.no_ask ?? (market.no_ask_dollars ? market.no_ask_dollars * 100 : null);
 
     if (yesBid != null) {
       document.getElementById('upPct').textContent = yesBid + '%';
@@ -690,7 +747,7 @@ async function loadAll() {
       }
 
       recordObservation(market, btcPrice, divergenceFiredNow, divergenceDirectionNow,
-        window.currentTrendState, window.currentMom1m, window.currentMom5m, yesBid);
+        window.currentTrendState, window.currentMom1m, window.currentMom5m, yesBid, yesAsk, noAsk);
     }
 
     const trendEl = document.getElementById('trendNote');
@@ -717,6 +774,7 @@ async function loadAll() {
 
   reconcileSettled(settled);
   renderStats();
+  renderPaperTrading();
 
   document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString();
 }
