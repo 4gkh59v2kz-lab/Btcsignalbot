@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalshi BTC 15m Watch</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #0D1117;
+    color: #E6E6E1;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 16px;
+  }
+  .wrap { max-width: 700px; margin: 0 auto; }
+  h1 { font-size: 17px; font-weight: 600; margin: 0 0 2px; }
+  .sub { color: #8B8F98; font-size: 13px; margin-bottom: 16px; }
+
+  .card {
+    background: #11161D;
+    border: 1px solid #21262D;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+  .card-title { font-size: 12px; font-weight: 600; color: #8B8F98; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+
+  .timer-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+  .timer { font-family: "SF Mono", Menlo, monospace; font-size: 26px; font-weight: 700; }
+  .timer.urgent { color: #F2545B; }
+  .strike { font-size: 13px; color: #8B8F98; text-align: right; }
+  .strike b { color: #E6E6E1; font-family: "SF Mono", Menlo, monospace; }
+
+  .odds-row { display: flex; gap: 10px; }
+  .odds-box { flex: 1; border-radius: 10px; padding: 14px; text-align: center; }
+  .odds-box.up { background: rgba(47,191,113,0.10); border: 1px solid rgba(47,191,113,0.3); }
+  .odds-box.down { background: rgba(242,84,91,0.10); border: 1px solid rgba(242,84,91,0.3); }
+  .odds-label { font-size: 12px; color: #8B8F98; margin-bottom: 4px; }
+  .odds-pct { font-family: "SF Mono", Menlo, monospace; font-size: 24px; font-weight: 700; }
+  .odds-box.up .odds-pct { color: #2FBF71; }
+  .odds-box.down .odds-pct { color: #F2545B; }
+  .odds-price { font-size: 11px; color: #8B8F98; margin-top: 2px; }
+
+  .btc-row { display: flex; align-items: baseline; justify-content: space-between; }
+  .btc-price { font-family: "SF Mono", Menlo, monospace; font-size: 22px; font-weight: 600; }
+  .btc-delta { font-family: "SF Mono", Menlo, monospace; font-size: 13px; }
+  .btc-delta.up { color: #2FBF71; }
+  .btc-delta.down { color: #F2545B; }
+  .btc-delta.flat { color: #8B8F98; }
+
+  .note { font-size: 12px; color: #8B8F98; margin-top: 8px; line-height: 1.5; }
+
+  .settled-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; font-size: 13px; border-bottom: 1px solid #1C2128;
+  }
+  .settled-item:last-child { border-bottom: none; }
+  .settled-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; display: inline-block; }
+  .settled-dot.yes { background: #2FBF71; }
+  .settled-dot.no { background: #F2545B; }
+
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+  button {
+    background: #1B222C; color: #E6E6E1; border: 1px solid #2A323D;
+    border-radius: 8px; padding: 9px 14px; font-size: 13px; font-weight: 500;
+  }
+  .meta { font-size: 12px; color: #8B8F98; margin-left: auto; }
+  .empty { color: #8B8F98; font-size: 13px; padding: 10px 0; text-align: center; }
+
+  .disclaimer {
+    margin-top: 18px; padding: 12px 14px;
+    background: rgba(247,147,26,0.08); border: 1px solid rgba(247,147,26,0.25);
+    border-radius: 8px; font-size: 12px; color: #C9CDD3; line-height: 1.5;
+  }
+  .disclaimer b { color: #F7931A; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kalshi BTC 15-min watch</h1>
+  <div class="sub">Live market odds for the current window, plus a BTC price check</div>
+
+  <div class="card">
+    <div class="card-title">Current window</div>
+    <div class="timer-row">
+      <div class="timer" id="timer">--:--</div>
+      <div class="strike" id="strikeInfo">Loading…</div>
+    </div>
+    <div class="odds-row">
+      <div class="odds-box up">
+        <div class="odds-label">Up</div>
+        <div class="odds-pct" id="upPct">--%</div>
+        <div class="odds-price" id="upPrice"></div>
+      </div>
+      <div class="odds-box down">
+        <div class="odds-label">Down</div>
+        <div class="odds-pct" id="downPct">--%</div>
+        <div class="odds-price" id="downPrice"></div>
+      </div>
+    </div>
+    <div class="note" id="kalshiNote"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">BTC spot price</div>
+    <div class="btc-row">
+      <span class="btc-price" id="btcPrice">—</span>
+      <span class="btc-delta" id="btcDelta"></span>
+    </div>
+    <div class="note" id="btcNote"></div>
+  </div>
+
+  <div class="row">
+    <button id="refreshBtn">Refresh</button>
+    <span class="meta" id="lastUpdate"></span>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Recent settled windows</div>
+    <div id="settledList"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div class="disclaimer">
+    <b>Not financial advice.</b> The Up/Down percentages are the live market's own pricing — not a prediction from this tool. A gap between BTC's raw spot price and the contract's strike is not the same as the official settlement average, which Kalshi calculates separately over the final 60 seconds of the window. Trade contracts, not spot moves.
+  </div>
+</div>
+
+<script>
+let countdownTimer = null;
+let currentCloseTime = null;
+
+function fmtPrice(p) {
+  return '$' + p.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function fetchBTCPrice() {
+  const sources = [
+    { url: 'https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD', parse: j => j.USD },
+    { url: 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', parse: j => j.bitcoin.usd },
+  ];
+  for (const s of sources) {
+    try {
+      const res = await fetch(s.url);
+      if (!res.ok) continue;
+      const json = await res.json();
+      const price = s.parse(json);
+      if (typeof price === 'number' && price > 0) return price;
+    } catch (e) { continue; }
+  }
+  return null;
+}
+
+async function fetchKalshiWindow() {
+  try {
+    const res = await fetch('https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=KXBTC15M&status=open&limit=5');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    if (!json.markets || json.markets.length === 0) return null;
+    const sorted = json.markets.sort((a,b) => new Date(a.close_time) - new Date(b.close_time));
+    return sorted[0];
+  } catch (e) {
+    window.lastKalshiError = e.message;
+    return null;
+  }
+}
+
+async function fetchSettledWindows() {
+  try {
+    const res = await fetch('https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=KXBTC15M&status=settled&limit=6');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    return json.markets || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function updateTimer() {
+  if (!currentCloseTime) return;
+  const now = new Date();
+  const diff = currentCloseTime - now;
+  const timerEl = document.getElementById('timer');
+  if (diff <= 0) {
+    timerEl.textContent = 'Settling…';
+    timerEl.className = 'timer urgent';
+    return;
+  }
+  const mins = Math.floor(diff / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  timerEl.textContent = mins + ':' + String(secs).padStart(2, '0');
+  timerEl.className = 'timer' + (diff < 60000 ? ' urgent' : '');
+}
+
+let lastBtcPrice = null;
+
+async function loadAll() {
+  const [market, btcPrice, settled] = await Promise.all([
+    fetchKalshiWindow(),
+    fetchBTCPrice(),
+    fetchSettledWindows()
+  ]);
+
+  // Kalshi window card
+  if (market) {
+    currentCloseTime = new Date(market.close_time);
+    if (countdownTimer) clearInterval(countdownTimer);
+    updateTimer();
+    countdownTimer = setInterval(updateTimer, 1000);
+
+    const strike = market.floor_strike ?? market.cap_strike ?? null;
+    document.getElementById('strikeInfo').innerHTML = strike
+      ? 'Strike: <b>' + fmtPrice(strike) + '</b>'
+      : (market.title || '');
+
+    const yesBid = market.yes_bid ?? (market.yes_bid_dollars ? market.yes_bid_dollars * 100 : null);
+    const noBid = market.no_bid ?? (market.no_bid_dollars ? market.no_bid_dollars * 100 : null);
+
+    if (yesBid != null) {
+      document.getElementById('upPct').textContent = yesBid + '%';
+      document.getElementById('upPrice').textContent = yesBid + '¢ per contract';
+    }
+    if (noBid != null) {
+      document.getElementById('downPct').textContent = noBid + '%';
+      document.getElementById('downPrice').textContent = noBid + '¢ per contract';
+    }
+    document.getElementById('kalshiNote').textContent = market.title || '';
+  } else {
+    document.getElementById('strikeInfo').textContent = 'Unavailable';
+    document.getElementById('kalshiNote').textContent = 'Error: ' + (window.lastKalshiError || 'could not reach Kalshi API');
+  }
+
+  // BTC price card
+  if (btcPrice) {
+    document.getElementById('btcPrice').textContent = fmtPrice(btcPrice);
+    const deltaEl = document.getElementById('btcDelta');
+    if (lastBtcPrice != null) {
+      const diff = btcPrice - lastBtcPrice;
+      const pct = (diff / lastBtcPrice) * 100;
+      deltaEl.textContent = (diff >= 0 ? '+' : '') + pct.toFixed(3) + '% since last check';
+      deltaEl.className = 'btc-delta ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat');
+    }
+    lastBtcPrice = btcPrice;
+
+    if (market && market.floor_strike) {
+      const gap = btcPrice - market.floor_strike;
+      const gapPct = (gap / market.floor_strike) * 100;
+      document.getElementById('btcNote').textContent =
+        (gap >= 0 ? gap.toFixed(0) + ' above' : Math.abs(gap).toFixed(0) + ' below') +
+        ' this window\'s strike (' + (gapPct >= 0 ? '+' : '') + gapPct.toFixed(3) + '%)';
+    }
+  } else {
+    document.getElementById('btcPrice').textContent = 'Unavailable';
+    document.getElementById('btcNote').textContent = 'Could not load BTC price.';
+  }
+
+  // Settled list
+  const listEl = document.getElementById('settledList');
+  if (settled.length === 0) {
+    listEl.innerHTML = '<div class="empty">No recent settled windows loaded.</div>';
+  } else {
+    listEl.innerHTML = settled.slice(0, 6).map(m => {
+      const result = m.result === 'yes' ? 'Up' : m.result === 'no' ? 'Down' : m.result || '?';
+      const dotClass = m.result === 'yes' ? 'yes' : 'no';
+      const time = new Date(m.close_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return '<div class="settled-item"><div><span class="settled-dot ' + dotClass + '"></span>' + result + '</div><div class="meta" style="margin:0">' + time + '</div></div>';
+    }).join('');
+  }
+
+  document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadAll);
+loadAll();
+setInterval(loadAll, 15000);
+</script>
+</body>
+</html>
