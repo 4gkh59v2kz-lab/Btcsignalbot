@@ -180,7 +180,7 @@ async function fetchCandles() {
           closes: raw.map(c => parseFloat(c[4]))
         };
       }
-    } catch (e) { continue; }
+    } catch (e) { window.lastFetchError = e.message; continue; }
   }
   return null;
 }
@@ -195,7 +195,7 @@ async function loadData() {
 
   const data = await fetchCandles();
   if (!data) {
-    loadingMsg.textContent = 'Could not load live BTC data right now. Tap Refresh to try again.';
+    loadingMsg.textContent = 'Error: ' + (window.lastFetchError || 'unknown - all sources returned empty');
     document.getElementById('statusWord').textContent = 'No data';
     document.getElementById('statusWhy').textContent = 'Connection issue — try refreshing';
     card.className = 'status-card wait';
