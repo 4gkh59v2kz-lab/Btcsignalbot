@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalshi BTC 15m Watch</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #0D1117;
+    color: #E6E6E1;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 16px;
+  }
+  .wrap { max-width: 700px; margin: 0 auto; }
+  h1 { font-size: 17px; font-weight: 600; margin: 0 0 2px; }
+  .sub { color: #8B8F98; font-size: 13px; margin-bottom: 16px; }
+
+  .card {
+    background: #11161D;
+    border: 1px solid #21262D;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+  .card-title { font-size: 12px; font-weight: 600; color: #8B8F98; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+
+  .timer-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+  .timer { font-family: "SF Mono", Menlo, monospace; font-size: 26px; font-weight: 700; }
+  .timer.urgent { color: #F2545B; }
+  .strike { font-size: 13px; color: #8B8F98; text-align: right; }
+  .strike b { color: #E6E6E1; font-family: "SF Mono", Menlo, monospace; }
+
+  .odds-row { display: flex; gap: 10px; }
+  .odds-box { flex: 1; border-radius: 10px; padding: 14px; text-align: center; }
+  .odds-box.up { background: rgba(47,191,113,0.10); border: 1px solid rgba(47,191,113,0.3); }
+  .odds-box.down { background: rgba(242,84,91,0.10); border: 1px solid rgba(242,84,91,0.3); }
+  .odds-label { font-size: 12px; color: #8B8F98; margin-bottom: 4px; }
+  .odds-pct { font-family: "SF Mono", Menlo, monospace; font-size: 24px; font-weight: 700; }
+  .odds-box.up .odds-pct { color: #2FBF71; }
+  .odds-box.down .odds-pct { color: #F2545B; }
+  .odds-price { font-size: 11px; color: #8B8F98; margin-top: 2px; }
+
+  .btc-row { display: flex; align-items: baseline; justify-content: space-between; }
+  .btc-price { font-family: "SF Mono", Menlo, monospace; font-size: 22px; font-weight: 600; }
+  .btc-delta { font-family: "SF Mono", Menlo, monospace; font-size: 13px; }
+  .btc-delta.up { color: #2FBF71; }
+  .btc-delta.down { color: #F2545B; }
+  .btc-delta.flat { color: #8B8F98; }
+
+  .note { font-size: 12px; color: #8B8F98; margin-top: 8px; line-height: 1.5; }
+
+  .settled-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; font-size: 13px; border-bottom: 1px solid #1C2128;
+  }
+  .settled-item:last-child { border-bottom: none; }
+  .settled-dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; display: inline-block; }
+  .settled-dot.yes { background: #2FBF71; }
+  .settled-dot.no { background: #F2545B; }
+
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+  button {
+    background: #1B222C; color: #E6E6E1; border: 1px solid #2A323D;
+    border-radius: 8px; padding: 9px 14px; font-size: 13px; font-weight: 500;
+  }
+  .meta { font-size: 12px; color: #8B8F98; margin-left: auto; }
+  .empty { color: #8B8F98; font-size: 13px; padding: 10px 0; text-align: center; }
+
+  .card.window-card { transition: border-color 0.3s, box-shadow 0.3s; }
+  .card.window-card.final-minute {
+    border-color: #F2545B;
+    box-shadow: 0 0 0 1px rgba(242,84,91,0.4), 0 0 20px rgba(242,84,91,0.15);
+    animation: pulseBorder 1s ease-in-out infinite;
+  }
+  @keyframes pulseBorder {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(242,84,91,0.4), 0 0 20px rgba(242,84,91,0.1); }
+    50% { box-shadow: 0 0 0 1px rgba(242,84,91,0.7), 0 0 28px rgba(242,84,91,0.3); }
+  }
+
+  .divergence-banner {
+    display: none;
+    background: rgba(247,147,26,0.12);
+    border: 1px solid rgba(247,147,26,0.4);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: #F7C877;
+    margin-bottom: 14px;
+    line-height: 1.4;
+  }
+  .divergence-banner.show { display: block; }
+  .divergence-banner b { color: #F7931A; }
+
+  .disclaimer {
+    margin-top: 18px; padding: 12px 14px;
+    background: rgba(247,147,26,0.08); border: 1px solid rgba(247,147,26,0.25);
+    border-radius: 8px; font-size: 12px; color: #C9CDD3; line-height: 1.5;
+  }
+  .disclaimer b { color: #F7931A; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kalshi BTC 15-min watch</h1>
+  <div class="sub">Live market odds for the current window, plus a BTC price check</div>
+
+  <div class="divergence-banner" id="divergenceBanner"></div>
+
+  <div class="card window-card" id="windowCard">
+    <div class="card-title">Current window</div>
+    <div class="timer-row">
+      <div class="timer" id="timer">--:--</div>
+      <div class="strike" id="strikeInfo">Loading…</div>
+    </div>
+    <div class="odds-row">
+      <div class="odds-box up">
+        <div class="odds-label">Up</div>
+        <div class="odds-pct" id="upPct">--%</div>
+        <div class="odds-price" id="upPrice"></div>
+      </div>
+      <div class="odds-box down">
+        <div class="odds-label">Down</div>
+        <div class="odds-pct" id="downPct">--%</div>
+        <div class="odds-price" id="downPrice"></div>
+      </div>
+    </div>
+    <div class="note" id="kalshiNote"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">BTC spot price</div>
+    <div class="btc-row">
+      <span class="btc-price" id="btcPrice">—</span>
+      <span class="btc-delta" id="btcDelta"></span>
+    </div>
+    <div class="note" id="btcNote"></div>
+    <div class="note" id="trendNote" style="margin-top:6px"></div>
+  </div>
+
+  <div class="row">
+    <button id="refreshBtn">Refresh</button>
+    <span class="meta" id="lastUpdate"></span>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Recent settled windows</div>
+    <div id="settledList"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Paper trading (simulated, no real money)</div>
+    <div id="paperTradingBody">
+      <div class="empty">Collecting data…</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Pattern log (builds over time)</div>
+    <div id="statsBody">
+      <div class="empty">Collecting data…</div>
+    </div>
+    <div class="row" style="margin-top: 12px;">
+      <button id="exportBtn">Export data (JSON)</button>
+      <button id="clearLogBtn">Clear log</button>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    <b>Not financial advice.</b> The Up/Down percentages are the live market's own pricing — not a prediction from this tool. A gap between BTC's raw spot price and the contract's strike is not the same as the official settlement average, which Kalshi calculates separately over the final 60 seconds of the window. Trade contracts, not spot moves.
+  </div>
+</div>
+
+<script>
+const LOG_KEY = 'kxbtc15m_log_v1';
+const MAX_LOG_SIZE = 1000;
+
+function loadLog() {
+  try {
+    const raw = localStorage.getItem(LOG_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
+}
+
+function saveLog(log) {
+  try {
+    localStorage.setItem(LOG_KEY, JSON.stringify(log));
+  } catch (e) { /* storage full or unavailable, ignore */ }
+}
+
+function pruneLog(log) {
+  const keys = Object.keys(log);
+  if (keys.length <= MAX_LOG_SIZE) return log;
+  const sorted = keys.sort((a, b) => new Date(log[a].closeTime) - new Date(log[b].closeTime));
+  const toRemove = sorted.slice(0, keys.length - MAX_LOG_SIZE);
+  toRemove.forEach(k => delete log[k]);
+  return log;
+}
+
+function recordObservation(market, btcPrice, divergenceFired, divergenceDirection, trendState, mom1m, mom5m, resolvedYesBid, resolvedYesAsk, resolvedNoAsk) {
+  const log = loadLog();
+  const ticker = market.ticker;
+  if (!ticker) return;
+
+  if (!log[ticker]) {
+    log[ticker] = {
+      ticker,
+      closeTime: market.close_time,
+      strike: market.floor_strike ?? null,
+      firstYesBid: resolvedYesBid ?? null,
+      firstYesAsk: resolvedYesAsk ?? null,
+      firstNoAsk: resolvedNoAsk ?? null,
+      firstBtcPrice: btcPrice,
+      firstTrendState: trendState ?? null,
+      firstMom1m: mom1m ?? null,
+      firstMom5m: mom5m ?? null,
+      hourUTC: new Date().getUTCHours(),
+      dayOfWeekUTC: new Date().getUTCDay(),
+      midYesBid: null,
+      midBtcPrice: null,
+      midCaptured: false,
+      lastYesBid: resolvedYesBid ?? null,
+      lastBtcPrice: btcPrice,
+      divergenceSeen: false,
+      divergenceDirection: null,
+      result: null,
+      source: 'observed'
+    };
+  }
+  const rec = log[ticker];
+  rec.lastYesBid = resolvedYesBid ?? rec.lastYesBid;
+  rec.lastBtcPrice = btcPrice ?? rec.lastBtcPrice;
+
+  // Capture a mid-window snapshot once we're roughly 40-60% through
+  if (!rec.midCaptured && currentCloseTime) {
+    const remaining = currentCloseTime - new Date();
+    const fractionElapsed = 1 - (remaining / 900000);
+    if (fractionElapsed >= 0.4 && fractionElapsed <= 0.65) {
+      rec.midYesBid = resolvedYesBid ?? null;
+      rec.midBtcPrice = btcPrice;
+      rec.midCaptured = true;
+    }
+  }
+
+  if (divergenceFired && !rec.divergenceSeen) {
+    rec.divergenceSeen = true;
+    rec.divergenceDirection = divergenceDirection;
+  }
+  saveLog(pruneLog(log));
+}
+
+function reconcileSettled(settledMarkets) {
+  const log = loadLog();
+  let changed = false;
+  settledMarkets.forEach(m => {
+    if (!m.ticker) return;
+    if (!log[m.ticker]) {
+      // We never observed this window live - backfill minimal record
+      log[m.ticker] = {
+        ticker: m.ticker,
+        closeTime: m.close_time,
+        strike: m.floor_strike ?? null,
+        firstYesBid: null,
+        firstBtcPrice: null,
+        firstTrendState: null,
+        firstMom1m: null,
+        firstMom5m: null,
+        midYesBid: null,
+        midBtcPrice: null,
+        midCaptured: false,
+        lastYesBid: null,
+        lastBtcPrice: null,
+        divergenceSeen: false,
+        divergenceDirection: null,
+        result: m.result ?? null,
+        source: 'backfill'
+      };
+      changed = true;
+    } else if (log[m.ticker].result == null && m.result) {
+      log[m.ticker].result = m.result;
+      changed = true;
+    }
+  });
+  if (changed) saveLog(pruneLog(log));
+}
+
+function computeStats() {
+  const log = loadLog();
+  const records = Object.values(log).filter(r => r.result === 'yes' || r.result === 'no');
+
+  const total = records.length;
+  const upCount = records.filter(r => r.result === 'yes').length;
+  const downCount = total - upCount;
+  const observedCount = records.filter(r => r.source === 'observed').length;
+  const backfillCount = total - observedCount;
+
+  const observedWithFirstBid = records.filter(r => r.firstYesBid != null);
+  const favoriteWins = observedWithFirstBid.filter(r => {
+    const favoredUp = r.firstYesBid > 50;
+    return (favoredUp && r.result === 'yes') || (!favoredUp && r.result === 'no');
+  }).length;
+
+  const divergenceRecords = records.filter(r => r.divergenceSeen && r.divergenceDirection);
+  const divergenceCorrect = divergenceRecords.filter(r =>
+    (r.divergenceDirection === 'up' && r.result === 'yes') ||
+    (r.divergenceDirection === 'down' && r.result === 'no')
+  ).length;
+
+  const trendRecords = records.filter(r => r.firstTrendState === 'bull' || r.firstTrendState === 'bear');
+  const trendCorrect = trendRecords.filter(r =>
+    (r.firstTrendState === 'bull' && r.result === 'yes') ||
+    (r.firstTrendState === 'bear' && r.result === 'no')
+  ).length;
+
+  const momRecords = records.filter(r => typeof r.firstMom1m === 'number' && r.firstMom1m !== 0);
+  const momCorrect = momRecords.filter(r =>
+    (r.firstMom1m > 0 && r.result === 'yes') ||
+    (r.firstMom1m < 0 && r.result === 'no')
+  ).length;
+
+  return {
+    total, upCount, downCount, observedCount, backfillCount,
+    observedWithFirstBid: observedWithFirstBid.length, favoriteWins,
+    divergenceTotal: divergenceRecords.length, divergenceCorrect,
+    trendTotal: trendRecords.length, trendCorrect,
+    momTotal: momRecords.length, momCorrect
+  };
+}
+
+function computePaperTrades() {
+  const log = loadLog();
+  const records = Object.values(log).filter(r => r.result === 'yes' || r.result === 'no');
+
+  const strategies = {
+    momentum: { n: 0, wins: 0, totalPnl: 0 },
+    favorite: { n: 0, wins: 0, totalPnl: 0 },
+    agreement: { n: 0, wins: 0, totalPnl: 0 }
+  };
+
+  for (const r of records) {
+    const hasMom = typeof r.firstMom1m === 'number' && r.firstMom1m !== 0;
+    const hasBid = r.firstYesBid != null;
+
+    // Strategy 1: momentum direction
+    if (hasMom) {
+      const side = r.firstMom1m > 0 ? 'yes' : 'no';
+      const entry = side === 'yes' ? r.firstYesAsk : r.firstNoAsk;
+      if (entry != null) {
+        const won = (side === 'yes' && r.result === 'yes') || (side === 'no' && r.result === 'no');
+        const cost = entry / 100;
+        const pnl = won ? (1 - cost) : -cost;
+        strategies.momentum.n++;
+        if (won) strategies.momentum.wins++;
+        strategies.momentum.totalPnl += pnl;
+      }
+    }
+
+    // Strategy 2: always bet the market's own favorite
+    if (hasBid) {
+      const side = r.firstYesBid > 50 ? 'yes' : 'no';
+      const entry = side === 'yes' ? r.firstYesAsk : r.firstNoAsk;
+      if (entry != null) {
+        const won = (side === 'yes' && r.result === 'yes') || (side === 'no' && r.result === 'no');
+        const cost = entry / 100;
+        const pnl = won ? (1 - cost) : -cost;
+        strategies.favorite.n++;
+        if (won) strategies.favorite.wins++;
+        strategies.favorite.totalPnl += pnl;
+      }
+    }
+
+    // Strategy 3: only trade when momentum agrees with the favorite
+    if (hasMom && hasBid) {
+      const momSaysUp = r.firstMom1m > 0;
+      const favSaysUp = r.firstYesBid > 50;
+      if (momSaysUp === favSaysUp) {
+        const side = momSaysUp ? 'yes' : 'no';
+        const entry = side === 'yes' ? r.firstYesAsk : r.firstNoAsk;
+        if (entry != null) {
+          const won = (side === 'yes' && r.result === 'yes') || (side === 'no' && r.result === 'no');
+          const cost = entry / 100;
+          const pnl = won ? (1 - cost) : -cost;
+          strategies.agreement.n++;
+          if (won) strategies.agreement.wins++;
+          strategies.agreement.totalPnl += pnl;
+        }
+      }
+    }
+  }
+
+  return strategies;
+}
+
+function renderPaperTrading() {
+  const s = computePaperTrades();
+  const el = document.getElementById('paperTradingBody');
+
+  const renderOne = (name, desc, data) => {
+    if (data.n < 5) {
+      return '<div style="margin-bottom:12px"><b style="color:#E6E6E1">' + name + '</b> <span style="color:#8B8F98">— ' + desc + '</span><br>' +
+        '<span class="empty" style="padding:4px 0;display:block">Collecting data (' + data.n + '/5 needed)</span></div>';
+    }
+    const winPct = ((data.wins / data.n) * 100).toFixed(1);
+    const [lo, hi] = wilsonInterval(data.wins, data.n);
+    const pnlColor = data.totalPnl >= 0 ? '#2FBF71' : '#F2545B';
+    const avgCents = (data.totalPnl / data.n) * 100;
+    return '<div style="margin-bottom:12px"><b style="color:#E6E6E1">' + name + '</b> <span style="color:#8B8F98">— ' + desc + '</span><br>' +
+      data.n + ' trades &middot; Won ' + winPct + '% <span style="color:#8B8F98">(95% range ' + lo.toFixed(0) + '–' + hi.toFixed(0) + '%)</span><br>' +
+      'P&L: <b style="color:' + pnlColor + '">' + (data.totalPnl >= 0 ? '+$' : '-$') + Math.abs(data.totalPnl).toFixed(2) + '</b>' +
+      ' (' + (avgCents >= 0 ? '+' : '') + avgCents.toFixed(1) + '¢/trade avg)</div>';
+  };
+
+  let html = '<div class="note" style="margin-top:0">';
+  html += renderOne('Momentum', 'bet the direction 1-min momentum points', s.momentum);
+  html += renderOne('Favorite', 'always bet whichever side the market already favors', s.favorite);
+  html += renderOne('Agreement', 'only bet when momentum and the favorite point the same way', s.agreement);
+  html += '<span style="color:#8B8F98">All hypothetical, no real money moved. Compare P&L, not just win rate — a high win rate on an expensive favorite can still be a thin or losing edge.</span>';
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function wilsonInterval(successes, n) {
+  if (n === 0) return [0, 0];
+  const z = 1.96; // 95% confidence
+  const p = successes / n;
+  const denom = 1 + (z * z) / n;
+  const center = p + (z * z) / (2 * n);
+  const margin = z * Math.sqrt((p * (1 - p) + (z * z) / (4 * n)) / n);
+  const low = (center - margin) / denom;
+  const high = (center + margin) / denom;
+  return [Math.max(0, low * 100), Math.min(100, high * 100)];
+}
+
+function renderStats() {
+  const s = computeStats();
+  const el = document.getElementById('statsBody');
+  if (s.total === 0) {
+    el.innerHTML = '<div class="empty">No settled windows logged yet — check back after a few windows close.</div>';
+    return;
+  }
+
+  const upPct = ((s.upCount / s.total) * 100).toFixed(1);
+  const downPct = ((s.downCount / s.total) * 100).toFixed(1);
+
+  const line = (correct, total, label) => {
+    if (total >= 5) {
+      const pct = ((correct / total) * 100).toFixed(1);
+      const [lo, hi] = wilsonInterval(correct, total);
+      return label + ': <b style="color:#E6E6E1">' + pct + '%</b> of ' + total +
+        ' <span style="color:#8B8F98">(95% range: ' + lo.toFixed(0) + '–' + hi.toFixed(0) + '%)</span><br>';
+    }
+    return label + ': collecting data (' + total + '/5 needed)<br>';
+  };
+
+  let html = '<div class="note" style="margin-top:0">';
+  html += '<b style="color:#E6E6E1">' + s.total + '</b> windows settled &middot; Up ' + upPct + '% / Down ' + downPct + '%<br>';
+  html += '<span style="color:#8B8F98">Of those: <b style="color:#E6E6E1">' + s.observedCount + '</b> watched live (usable for analysis), ' +
+    '<b style="color:#E6E6E1">' + s.backfillCount + '</b> only backfilled after the fact (result only, no detail)</span><br><br>';
+  html += line(s.favoriteWins, s.observedWithFirstBid, 'Market\'s own opening favorite');
+  html += line(s.divergenceCorrect, s.divergenceTotal, 'Divergence flag');
+  html += line(s.trendCorrect, s.trendTotal, '15m EMA/RSI trend state');
+  html += line(s.momCorrect, s.momTotal, '1-min momentum direction');
+  html += '<br><span style="color:#8B8F98">The 95% range shows how uncertain a stat still is at this sample size — a wide range means don\'t trust the headline number yet.</span>';
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const log = loadLog();
+  const blob = new Blob([JSON.stringify(log, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'kxbtc15m_log_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('clearLogBtn').addEventListener('click', () => {
+  if (confirm('Delete all logged window data from this browser? This cannot be undone.')) {
+    localStorage.removeItem(LOG_KEY);
+    renderStats();
+  }
+});
+
+let countdownTimer = null;
+let currentCloseTime = null;
+let alertedForThisWindow = null;
+let currentTicker = null;
+
+const PRICE_HISTORY_KEY = 'btc_price_history_v1';
+function loadPriceHistory() {
+  try {
+    const raw = localStorage.getItem(PRICE_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function savePriceHistory(hist) {
+  try { localStorage.setItem(PRICE_HISTORY_KEY, JSON.stringify(hist)); } catch (e) {}
+}
+function recordPricePoint(price) {
+  const hist = loadPriceHistory();
+  hist.push({ t: Date.now(), p: price });
+  const cutoff = Date.now() - 10 * 60 * 1000; // keep 10 minutes
+  const trimmed = hist.filter(pt => pt.t >= cutoff);
+  savePriceHistory(trimmed);
+  return trimmed;
+}
+function momentumOverWindow(hist, ms) {
+  const now = Date.now();
+  const target = now - ms;
+  let closest = null;
+  for (const pt of hist) {
+    if (pt.t <= now && (closest === null || Math.abs(pt.t - target) < Math.abs(closest.t - target))) {
+      closest = pt;
+    }
+  }
+  if (!closest || hist.length === 0) return null;
+  const latest = hist[hist.length - 1];
+  if (!latest || closest.t === latest.t) return null;
+  return ((latest.p - closest.p) / closest.p) * 100;
+}
+
+function ema(values, period) {
+  const k = 2 / (period + 1);
+  const out = new Array(values.length).fill(null);
+  let prev = values.slice(0, period).reduce((a,b) => a+b, 0) / period;
+  out[period - 1] = prev;
+  for (let i = period; i < values.length; i++) {
+    prev = values[i] * k + prev * (1 - k);
+    out[i] = prev;
+  }
+  return out;
+}
+function rsi(values, period) {
+  const out = new Array(values.length).fill(null);
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const diff = values[i] - values[i-1];
+    if (diff >= 0) gains += diff; else losses -= diff;
+  }
+  let avgGain = gains / period, avgLoss = losses / period;
+  out[period] = 100 - (100 / (1 + (avgLoss === 0 ? 100 : avgGain / avgLoss)));
+  for (let i = period + 1; i < values.length; i++) {
+    const diff = values[i] - values[i-1];
+    const gain = diff > 0 ? diff : 0, loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    out[i] = 100 - (100 / (1 + rs));
+  }
+  return out;
+}
+
+async function fetchTrendState() {
+  // Primary: CryptoCompare 15m aggregated candles
+  try {
+    const url = 'https://min-api.cryptocompare.com/data/v2/histominute?fsym=BTC&tsym=USDT&limit=100&aggregate=15';
+    const res = await fetch(url);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.Response === 'Success' && json.Data && Array.isArray(json.Data.Data)) {
+        const closes = json.Data.Data.map(c => c.close).filter(c => c > 0);
+        if (closes.length > 25) {
+          const state = evalTrend(closes);
+          if (state.state) return state;
+        }
+      }
+    }
+  } catch (e) { /* fall through to backup */ }
+
+  // Backup: CoinGecko 30-min candles (coarser, but works when CryptoCompare is blocked)
+  try {
+    const url = 'https://api.coingecko.com/api/v3/coins/bitcoin/ohlc?vs_currency=usd&days=1';
+    const res = await fetch(url);
+    if (res.ok) {
+      const arr = await res.json();
+      if (Array.isArray(arr) && arr.length > 25) {
+        const closes = arr.map(c => c[4]).filter(c => c > 0);
+        return evalTrend(closes);
+      }
+    }
+  } catch (e) { /* fall through */ }
+
+  return { state: null, rsi: null };
+}
+
+function evalTrend(closes) {
+  const e9 = ema(closes, 9), e21 = ema(closes, 21), r14 = rsi(closes, 14);
+  const i = closes.length - 1;
+  if (e9[i] != null && e21[i] != null && r14[i] != null) {
+    if (e9[i] > e21[i] && r14[i] < 65) return { state: 'bull', rsi: r14[i] };
+    if (e9[i] < e21[i] && r14[i] > 35) return { state: 'bear', rsi: r14[i] };
+    return { state: 'neutral', rsi: r14[i] };
+  }
+  return { state: null, rsi: null };
+}
+
+function playAlertBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.18, 0.36].forEach((delay, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.15);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.15);
+    });
+  } catch (e) { /* audio not available, ignore */ }
+}
+
+function fmtPrice(p) {
+  return '$' + p.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function fetchBTCPrice() {
+  const sources = [
+    { url: 'https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD', parse: j => j.USD },
+    { url: 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', parse: j => j.bitcoin.usd },
+  ];
+  for (const s of sources) {
+    try {
+      const res = await fetch(s.url);
+      if (!res.ok) continue;
+      const json = await res.json();
+      const price = s.parse(json);
+      if (typeof price === 'number' && price > 0) return price;
+    } catch (e) { continue; }
+  }
+  return null;
+}
+
+async function fetchViaProxies(targetUrl) {
+  const proxies = [
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl),
+    'https://corsproxy.io/?url=' + encodeURIComponent(targetUrl)
+  ];
+  for (const proxied of proxies) {
+    try {
+      const res = await fetch(proxied);
+      if (!res.ok) continue;
+      const json = await res.json();
+      if (json) return json;
+    } catch (e) { continue; }
+  }
+  throw new Error('all proxies failed');
+}
+
+async function fetchKalshiWindow() {
+  const target = 'https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=KXBTC15M&status=open&limit=5';
+  try {
+    const json = await fetchViaProxies(target);
+    if (!json.markets || json.markets.length === 0) return null;
+    const sorted = json.markets.sort((a,b) => new Date(a.close_time) - new Date(b.close_time));
+    return sorted[0];
+  } catch (e) {
+    window.lastKalshiError = e.message;
+    return null;
+  }
+}
+
+async function fetchSettledWindows() {
+  const target = 'https://external-api.kalshi.com/trade-api/v2/markets?series_ticker=KXBTC15M&status=settled&limit=6';
+  try {
+    const json = await fetchViaProxies(target);
+    return json.markets || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function updateTimer() {
+  if (!currentCloseTime) return;
+  const now = new Date();
+  const diff = currentCloseTime - now;
+  const timerEl = document.getElementById('timer');
+  const windowCard = document.getElementById('windowCard');
+  if (diff <= 0) {
+    timerEl.textContent = 'Settling…';
+    timerEl.className = 'timer urgent';
+    return;
+  }
+  const mins = Math.floor(diff / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  timerEl.textContent = mins + ':' + String(secs).padStart(2, '0');
+
+  if (diff < 60000) {
+    timerEl.className = 'timer urgent';
+    windowCard.classList.add('final-minute');
+    const windowKey = currentCloseTime.getTime();
+    if (alertedForThisWindow !== windowKey) {
+      alertedForThisWindow = windowKey;
+      playAlertBeep();
+    }
+  } else {
+    timerEl.className = 'timer';
+    windowCard.classList.remove('final-minute');
+  }
+}
+
+let lastBtcPrice = null;
+
+async function loadAll() {
+  const [market, btcPrice, settled] = await Promise.all([
+    fetchKalshiWindow(),
+    fetchBTCPrice(),
+    fetchSettledWindows()
+  ]);
+
+  let yesAsk = null, noAsk = null;
+
+  if (btcPrice) {
+    const hist = recordPricePoint(btcPrice);
+    window.currentMom1m = momentumOverWindow(hist, 60 * 1000);
+    window.currentMom5m = momentumOverWindow(hist, 5 * 60 * 1000);
+  }
+
+  // Only fetch the 15m trend state once per new window, not every poll
+  if (market && market.ticker !== currentTicker) {
+    currentTicker = market.ticker;
+    const trend = await fetchTrendState();
+    window.currentTrendState = trend.state;
+  }
+
+  // Kalshi window card
+  if (market) {
+    currentCloseTime = new Date(market.close_time);
+    if (countdownTimer) clearInterval(countdownTimer);
+    updateTimer();
+    countdownTimer = setInterval(updateTimer, 1000);
+
+    const strike = market.floor_strike ?? market.cap_strike ?? null;
+    document.getElementById('strikeInfo').innerHTML = strike
+      ? 'Strike: <b>' + fmtPrice(strike) + '</b>'
+      : (market.title || '');
+
+    const yesBid = market.yes_bid ?? (market.yes_bid_dollars ? market.yes_bid_dollars * 100 : null);
+    const noBid = market.no_bid ?? (market.no_bid_dollars ? market.no_bid_dollars * 100 : null);
+    yesAsk = market.yes_ask ?? (market.yes_ask_dollars ? market.yes_ask_dollars * 100 : null);
+    noAsk = market.no_ask ?? (market.no_ask_dollars ? market.no_ask_dollars * 100 : null);
+
+    if (yesBid != null) {
+      document.getElementById('upPct').textContent = yesBid + '%';
+      document.getElementById('upPrice').textContent = yesBid + '¢ per contract';
+    }
+    if (noBid != null) {
+      document.getElementById('downPct').textContent = noBid + '%';
+      document.getElementById('downPrice').textContent = noBid + '¢ per contract';
+    }
+    document.getElementById('kalshiNote').textContent = market.title || '';
+  } else {
+    document.getElementById('strikeInfo').textContent = 'Unavailable';
+    document.getElementById('kalshiNote').textContent = 'Error: ' + (window.lastKalshiError || 'could not reach Kalshi API');
+  }
+
+  // BTC price card
+  if (btcPrice) {
+    document.getElementById('btcPrice').textContent = fmtPrice(btcPrice);
+    const deltaEl = document.getElementById('btcDelta');
+    if (lastBtcPrice != null) {
+      const diff = btcPrice - lastBtcPrice;
+      const pct = (diff / lastBtcPrice) * 100;
+      deltaEl.textContent = (diff >= 0 ? '+' : '') + pct.toFixed(3) + '% since last check';
+      deltaEl.className = 'btc-delta ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat');
+    }
+    lastBtcPrice = btcPrice;
+
+    if (market && market.floor_strike) {
+      const gap = btcPrice - market.floor_strike;
+      const gapPct = (gap / market.floor_strike) * 100;
+      document.getElementById('btcNote').textContent =
+        (gap >= 0 ? gap.toFixed(0) + ' above' : Math.abs(gap).toFixed(0) + ' below') +
+        ' this window\'s strike (' + (gapPct >= 0 ? '+' : '') + gapPct.toFixed(3) + '%)';
+
+      // Divergence check: does spot's position vs strike disagree with the market's own lean?
+      const banner = document.getElementById('divergenceBanner');
+      const yesBid = market.yes_bid ?? (market.yes_bid_dollars ? market.yes_bid_dollars * 100 : null);
+      let divergenceFiredNow = false;
+      let divergenceDirectionNow = null;
+      if (yesBid != null && Math.abs(gap) > 0) {
+        const spotSaysUp = gap > 0;
+        const marketSaysUp = yesBid > 50;
+        const marketConfident = yesBid > 65 || yesBid < 35;
+        if (spotSaysUp !== marketSaysUp && marketConfident) {
+          divergenceFiredNow = true;
+          divergenceDirectionNow = spotSaysUp ? 'up' : 'down';
+          banner.className = 'divergence-banner show';
+          banner.innerHTML = '<b>Divergence:</b> BTC spot is currently trading ' +
+            (spotSaysUp ? 'above' : 'below') + ' this window\'s strike, but the market is pricing ' +
+            (marketSaysUp ? 'Up' : 'Down') + ' more likely (' + yesBid + '% up). Spot may have moved since the last quote, or the market expects reversion before close.';
+        } else {
+          banner.className = 'divergence-banner';
+        }
+      }
+
+      recordObservation(market, btcPrice, divergenceFiredNow, divergenceDirectionNow,
+        window.currentTrendState, window.currentMom1m, window.currentMom5m, yesBid, yesAsk, noAsk);
+    }
+
+    const trendEl = document.getElementById('trendNote');
+    const trendLabel = window.currentTrendState === 'bull' ? 'Bullish' : window.currentTrendState === 'bear' ? 'Bearish' : window.currentTrendState === 'neutral' ? 'Neutral' : '—';
+    const mom1 = window.currentMom1m != null ? (window.currentMom1m >= 0 ? '+' : '') + window.currentMom1m.toFixed(3) + '%' : '—';
+    trendEl.textContent = '15m trend: ' + trendLabel + ' · 1-min momentum: ' + mom1;
+  } else {
+    document.getElementById('btcPrice').textContent = 'Unavailable';
+    document.getElementById('btcNote').textContent = 'Could not load BTC price.';
+  }
+
+  // Settled list
+  const listEl = document.getElementById('settledList');
+  if (settled.length === 0) {
+    listEl.innerHTML = '<div class="empty">No recent settled windows loaded.</div>';
+  } else {
+    listEl.innerHTML = settled.slice(0, 6).map(m => {
+      const result = m.result === 'yes' ? 'Up' : m.result === 'no' ? 'Down' : m.result || '?';
+      const dotClass = m.result === 'yes' ? 'yes' : 'no';
+      const time = new Date(m.close_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return '<div class="settled-item"><div><span class="settled-dot ' + dotClass + '"></span>' + result + '</div><div class="meta" style="margin:0">' + time + '</div></div>';
+    }).join('');
+  }
+
+  reconcileSettled(settled);
+  renderStats();
+  renderPaperTrading();
+
+  document.getElementById('lastUpdate').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadAll);
+loadAll();
+setInterval(loadAll, 15000);
+</script>
+</body>
+</html>
