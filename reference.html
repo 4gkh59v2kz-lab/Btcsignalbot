@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalshi BTC Reference</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #0D1117;
+    color: #E6E6E1;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 16px;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+  .sub { color: #8B8F98; font-size: 13px; margin-bottom: 20px; }
+  h2 {
+    font-size: 13px; font-weight: 700; color: #F7931A;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    margin: 28px 0 12px; padding-bottom: 6px;
+    border-bottom: 1px solid #21262D;
+  }
+  h2:first-of-type { margin-top: 0; }
+  .card {
+    background: #11161D; border: 1px solid #21262D; border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 14px;
+  }
+  p { margin: 0 0 10px; font-size: 14px; color: #C9CDD3; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 6px; }
+  th { text-align: left; color: #8B8F98; font-weight: 600; padding: 6px 8px; border-bottom: 1px solid #21262D; }
+  td { padding: 7px 8px; border-bottom: 1px solid #171C24; color: #E6E6E1; }
+  td.mono, .mono { font-family: "SF Mono", Menlo, monospace; }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px;
+    border-radius: 5px; margin-left: 6px;
+  }
+  .tag.dead { background: rgba(242,84,91,0.15); color: #F2545B; }
+  .tag.maybe { background: rgba(247,147,26,0.15); color: #F7931A; }
+  .tag.solid { background: rgba(47,191,113,0.15); color: #2FBF71; }
+  .tag.untested { background: rgba(139,143,152,0.15); color: #8B8F98; }
+  ul { margin: 0 0 10px; padding-left: 20px; font-size: 14px; color: #C9CDD3; }
+  li { margin-bottom: 6px; }
+  .callout {
+    background: rgba(247,147,26,0.08); border: 1px solid rgba(247,147,26,0.25);
+    border-radius: 10px; padding: 14px 16px; font-size: 13px; color: #C9CDD3; margin: 14px 0;
+  }
+  .callout b { color: #F7931A; }
+  .stat-row { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; border-bottom: 1px solid #171C24; }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { color: #8B8F98; }
+  .stat-val { font-family: "SF Mono", Menlo, monospace; color: #E6E6E1; }
+  .disclaimer {
+    margin-top: 24px; padding: 14px 16px;
+    background: rgba(242,84,91,0.06); border: 1px solid rgba(242,84,91,0.2);
+    border-radius: 10px; font-size: 12px; color: #C9CDD3; line-height: 1.5;
+  }
+  .disclaimer b { color: #F2545B; }
+  .updated { font-size: 12px; color: #8B8F98; text-align: right; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kalshi BTC Reference</h1>
+  <div class="sub">Everything verified so far — how the markets work, and what our own data has actually shown</div>
+
+  <h2>1. The BTC market ladder on Kalshi</h2>
+  <div class="card">
+    <p>Kalshi doesn't run one Bitcoin market — it runs the same underlying question at six different speeds. All of them settle against the same reference price family (CF Benchmarks' Bitcoin Real-Time Index, averaged over the final 60 seconds of the window), so the mechanics are consistent — only the window length changes.</p>
+    <table>
+      <tr><th>Frequency</th><th>Ticker</th><th>What it asks</th></tr>
+      <tr><td>15-minute</td><td class="mono">KXBTC15M</td><td>Up or down vs. the strike at window open</td></tr>
+      <tr><td>Hourly</td><td class="mono">KXBTCD</td><td>Above or below a strike price</td></tr>
+      <tr><td>Daily / Weekly / Monthly</td><td class="mono">(rotating)</td><td>Same above/below structure, longer windows</td></tr>
+      <tr><td>Yearly</td><td class="mono">KXBTCY / KXBTCMAXY / KXBTCMINY</td><td>Year-end price, and yearly max/min thresholds</td></tr>
+    </table>
+    <p style="margin-top:10px; font-size:12px; color:#8B8F98;">Ticker names occasionally rotate — always confirm the live ticker on Kalshi's own market page before trusting an automated fetch.</p>
+  </div>
+
+  <h2>2. How settlement actually works</h2>
+  <div class="card">
+    <ul>
+      <li>Every window settles against <b>CF Benchmarks' Real-Time Index</b>, not a single exchange's last-traded price.</li>
+      <li>The reference value is a <b>60-second average</b> right before the window opens, and another 60-second average right before it closes — not an instantaneous snapshot.</li>
+      <li>Real-time, licensed access to that exact index feed is not freely available — it requires a commercial agreement with CF Benchmarks. Our tool approximates spot price using free feeds (CryptoCompare, CoinGecko), which will diverge slightly from Kalshi's own settlement price at any given instant.</li>
+    </ul>
+  </div>
+
+  <h2>3. About Kalshi itself</h2>
+  <div class="card">
+    <ul>
+      <li>Founded 2018, launched publicly in July 2021. Based in Manhattan, NY.</li>
+      <li>Regulated by the CFTC as an event-contract exchange — legally distinct from a sportsbook or a brokerage.</li>
+      <li><b>Sports now make up 90%+ of Kalshi's total activity and revenue</b> — crypto, weather, economics, and politics are meaningfully smaller categories by volume.</li>
+      <li>Public read-only market data (prices, volumes) is available with no login via <span class="mono">external-api.kalshi.com/trade-api/v2</span> — this is what our own tools use.</li>
+      <li>Trading fees exist and are non-trivial — we have <b>not</b> built real fee modeling into our paper-trading numbers yet. Every profit figure we've calculated so far is a slight overestimate versus what real trading would net.</li>
+    </ul>
+  </div>
+
+  <h2>4. What our own data has actually found (15-min BTC)</h2>
+  <div class="callout">
+    <b>This is the important part.</b> Everything below comes from our own logged, real-money-adjacent data — not theory, not a third party's claims. As of the last checkpoint: <b>~250 windows tracked, ~127 watched live start-to-finish.</b>
+  </div>
+  <div class="card">
+    <div class="stat-row"><span class="stat-label">Overall Up / Down split</span><span class="stat-val">~50 / 50</span></div>
+    <div class="stat-row"><span class="stat-label">Momentum (1-min price direction) <span class="tag dead">FADED</span></span><span class="stat-val">Peaked ~70%, decayed to ~59%, went profit-negative</span></div>
+    <div class="stat-row"><span class="stat-label">15m EMA9/21 + RSI trend state <span class="tag dead">NO EDGE</span></span><span class="stat-val">Stayed ~50-56%, coin-flip range</span></div>
+    <div class="stat-row"><span class="stat-label">Divergence flag (spot vs. market disagree) <span class="tag dead">WORSE THAN CHANCE</span></span><span class="stat-val">20-31% correct across checkpoints</span></div>
+    <div class="stat-row"><span class="stat-label">Market's own favorite price <span class="tag solid">STABLE</span></span><span class="stat-val">Consistently 68-73% correct</span></div>
+    <div class="stat-row"><span class="stat-label">Momentum + Favorite agreement <span class="tag maybe">CONVERGING</span></span><span class="stat-val">Started ahead (77%, 6.3¢/trade), narrowed toward Favorite alone as sample grew</span></div>
+  </div>
+  <p style="font-size:13px;">The honest read: nothing has beaten the market's own pricing in a way that's clearly not just noise. "Favorite" being reliable isn't an edge — it's confirmation the market prices itself fairly, which is expected on a liquid, continuously-arbitraged asset.</p>
+
+  <h2>5. How to read any of these stats</h2>
+  <div class="card">
+    <ul>
+      <li><b>5 samples</b> — the floor before a stat shows anything at all. Still meaningless on its own.</li>
+      <li><b>~30 samples</b> — a real number starts to exist, but the honest range around it is still wide (±15-20 points).</li>
+      <li><b>~100 samples</b> — a stable-looking edge here is worth taking seriously.</li>
+      <li><b>Win rate ≠ profit.</b> A strategy that wins 80% of the time on an 85¢ favorite can still lose money; one correct wrong-way bet erases several right ones.</li>
+      <li><b>Every stat here has a confidence range for a reason</b> — a headline percentage without one is a number chosen to look convincing, not to be true.</li>
+    </ul>
+  </div>
+
+  <h2>6. Untested / open threads</h2>
+  <div class="card">
+    <ul>
+      <li>Mid-window odds movement (captured on every window, never analyzed) <span class="tag untested">OPEN</span></li>
+      <li>Time-of-day / session effects (hour-of-day logged on every window, never analyzed) <span class="tag untested">OPEN</span></li>
+      <li>MACD, Bollinger Bands, volume-based indicators <span class="tag untested">OPEN</span></li>
+      <li>Betting the opposite of the Divergence flag, given it's been consistently wrong <span class="tag untested">OPEN</span></li>
+      <li>Hourly BTC market (KXBTCD) — separate log running in parallel, too early to read yet <span class="tag untested">OPEN</span></li>
+    </ul>
+  </div>
+
+  <div class="disclaimer">
+    <b>Not financial advice.</b> Nothing on this page is a recommendation to trade. It's a record of what we've actually tested and verified, kept honest on purpose — including the parts that didn't work. Real trading fees are not yet reflected in any profit figures shown here or in the linked tools.
+  </div>
+  <div class="updated">Compiled from our own logged data through Sept 2026</div>
+</div>
+</body>
+</html>
